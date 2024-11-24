@@ -4,14 +4,17 @@ import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-import base64
-from io import BytesIO
+# import base64
+# from io import BytesIO
 import csv
 import copy
 import argparse
 import itertools
 from collections import Counter
 from collections import deque
+import threading
+import json
+# from flask import jsonify
 
 import cv2 as cv
 import numpy as np
@@ -20,9 +23,11 @@ import mediapipe as mp
 from HandTracking.utils import CvFpsCalc
 from HandTracking.model import KeyPointClassifier
 from HandTracking.model import PointHistoryClassifier
+from dictionaryGlobal import dictionaryforEverything
 
 # Global Variable for Flask ###########################
-dictionaryforEverything = {}
+# dictionaryforEverything = {}
+data_lock = threading.Lock()
 ######################################################
 
 def get_args():
@@ -48,6 +53,8 @@ def get_args():
 
 
 def main():
+    import time
+    # global dictionaryforEverything
     # Argument parsing #################################################################
     args = get_args()
 
@@ -75,19 +82,21 @@ def main():
         min_tracking_confidence=min_tracking_confidence,
     )
 
+    # global dictionaryforEverything
+
     keypoint_classifier = KeyPointClassifier()
 
     point_history_classifier = PointHistoryClassifier()
 
     # Read labels ###########################################################
-    with open('model/keypoint_classifier/keypoint_classifier_label.csv',
+    with open('HandTracking/model/keypoint_classifier/keypoint_classifier_label.csv',
               encoding='utf-8-sig') as f:
         keypoint_classifier_labels = csv.reader(f)
         keypoint_classifier_labels = [
             row[0] for row in keypoint_classifier_labels
         ]
     with open(
-            'model/point_history_classifier/point_history_classifier_label.csv',
+            'HandTracking/model/point_history_classifier/point_history_classifier_label.csv',
             encoding='utf-8-sig') as f:
         point_history_classifier_labels = csv.reader(f)
         point_history_classifier_labels = [
@@ -95,7 +104,7 @@ def main():
         ]
 
     # FPS Measurement ########################################################
-    cvFpsCalc = CvFpsCalc(buffer_len=10)
+    # cvFpsCalc = CvFpsCalc(buffer_len=10)
 
     # Coordinate history #################################################################
     history_length = 16
@@ -111,7 +120,7 @@ def main():
     mode = 0
 
     while True:
-        fps = cvFpsCalc.get()
+        # fps = cvFpsCalc.get()
 
         # Process Key (ESC: end) #################################################
         key = cv.waitKey(10)
@@ -200,8 +209,20 @@ def main():
                     point_history_classifier_labels[most_common_fg_id[0][0]],
                 )
 
-                dictionaryforEverything = returntoFlask(debug_image, hand_location, point_history, C_distance, finger_gesture_id, hand_sign_id)
-                debug_image = dictionaryforEverything.get('image', debug_image)
+                newdata, debug_image = returntoFlask(debug_image, hand_location, point_history, C_distance, finger_gesture_id, hand_sign_id)
+                # with data_lock:
+                    # dictionaryforEverything.clear()
+                dictionaryforEverything.update(newdata)
+                with open('dictionaryGlobal.json', 'w') as f:
+                    json.dump(dictionaryforEverything, f)
+                    # print("updated Dictionary: ", dictionaryforEverything)
+                    # time.sleep(1)
+                # debug_image = dictionaryforEverything.get('image', debug_image)
+                # print(dictionaryforEverything)
+                # key_to_remove = 'image'
+
+                # filtered_dict = {key: value for key, value in dictionaryforEverything.items() if key != key_to_remove}
+                # print(filtered_dict)
         else:
             point_history.append([0, 0])
 
@@ -556,49 +577,48 @@ def draw_info_text(image, brect, handedness, hand_sign_text,
     return image
 
 
-def draw_point_history(image, point_history):
-    for index, point in enumerate(point_history):
-        if point[0] != 0 and point[1] != 0:
-            cv.circle(image, (point[0], point[1]), 1 + int(index / 2),
-                      (152, 251, 152), 2)
-            cv.rectangle(image, (0, 0), (400, 30), (255, 255, 255), thickness=-1)
-            cv.putText(image, "Pointer Location: " + str(point[0]) + ", " + str(point[1]), (10,30), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv.LINE_AA)
+# def draw_point_history(image, point_history):
+#     for index, point in enumerate(point_history):
+#         if point[0] != 0 and point[1] != 0:
+#             cv.circle(image, (point[0], point[1]), 1 + int(index / 2),
+#                       (152, 251, 152), 2)
+#             cv.rectangle(image, (0, 0), (400, 30), (255, 255, 255), thickness=-1)
+#             cv.putText(image, "Pointer Location: " + str(point[0]) + ", " + str(point[1]), (10,30), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv.LINE_AA)
 
-    return image
+#     return image
 
-def draw_hand_location(image, hand_location):
-    for index, point in enumerate(hand_location):
-        if point[0] != 0 and point[1] != 0:
-            cv.circle(image, (point[0], point[1]), 1 + int(index / 2),
-                      (152, 251, 152), 2)
-            cv.rectangle(image, (0, 0), (400, 30), (255, 255, 255), thickness=-1)
-            cv.putText(image, "Pointer Location: " + str(point[0]) + ", " + str(point[1]), (10,30), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv.LINE_AA)
+# def draw_hand_location(image, hand_location):
+#     for index, point in enumerate(hand_location):
+#         if point[0] != 0 and point[1] != 0:
+#             cv.circle(image, (point[0], point[1]), 1 + int(index / 2),
+#                       (152, 251, 152), 2)
+#             cv.rectangle(image, (0, 0), (400, 30), (255, 255, 255), thickness=-1)
+#             cv.putText(image, "Pointer Location: " + str(point[0]) + ", " + str(point[1]), (10,30), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv.LINE_AA)
 
-    return image
+#     return image
 
 
-def draw_info(image, fps, mode, number):
-    # cv.putText(image, "FPS:" + str(fps), (10, 30), cv.FONT_HERSHEY_SIMPLEX,
-    #            1.0, (0, 0, 0), 4, cv.LINE_AA)
-    # cv.putText(image, "FPS:" + str(fps), (10, 30), cv.FONT_HERSHEY_SIMPLEX,
-    #            1.0, (255, 255, 255), 2, cv.LINE_AA)
+# def draw_info(image, fps, mode, number):
+#     # cv.putText(image, "FPS:" + str(fps), (10, 30), cv.FONT_HERSHEY_SIMPLEX,
+#     #            1.0, (0, 0, 0), 4, cv.LINE_AA)
+#     # cv.putText(image, "FPS:" + str(fps), (10, 30), cv.FONT_HERSHEY_SIMPLEX,
+#     #            1.0, (255, 255, 255), 2, cv.LINE_AA)
 
-    mode_string = ['Logging Key Point', 'Logging Point History']
-    if 1 <= mode <= 2:
-        cv.putText(image, "MODE:" + mode_string[mode - 1], (10, 90),
-                   cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1,
-                   cv.LINE_AA)
-        if 0 <= number <= 9:
-            cv.putText(image, "NUM:" + str(number), (10, 110),
-                       cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1,
-                       cv.LINE_AA)
-    return image
+#     mode_string = ['Logging Key Point', 'Logging Point History']
+#     if 1 <= mode <= 2:
+#         cv.putText(image, "MODE:" + mode_string[mode - 1], (10, 90),
+#                    cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1,
+#                    cv.LINE_AA)
+#         if 0 <= number <= 9:
+#             cv.putText(image, "NUM:" + str(number), (10, 110),
+#                        cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1,
+#                        cv.LINE_AA)
+#     return image
 
 #packages up necessary values for Flask also displays value right now
 def returntoFlask(image, hand_location, point_history, C_distance, finger_gesture_id, hand_sign_id):
     result = {}
     if hand_sign_id == 0 or hand_sign_id == 1:
-        # result['hand_location'] = hand_location
         for index, point in enumerate(hand_location):
             if point[0] != 0 and point[1] != 0:
                 cv.circle(image, (point[0], point[1]), 1 + int(index / 2),
@@ -611,7 +631,6 @@ def returntoFlask(image, hand_location, point_history, C_distance, finger_gestur
         result['hand_location'] = None
 
     if hand_sign_id == 2:
-        # result['point_history'] = point_history
         result['finger_gesture_id'] = finger_gesture_id
         for index, point in enumerate(point_history):
             if point[0] != 0 and point[1] != 0:
@@ -632,12 +651,11 @@ def returntoFlask(image, hand_location, point_history, C_distance, finger_gestur
     else:
         result['C_distance'] = None
 
-    ret, buffer = cv.imencode('.jpg', image)
-    img_str = base64.b64encode(buffer).decode('utf-8')
-    result['image'] = image
-    result['flaskImage'] = img_str
-    return result
-
+    # ret, buffer = cv.imencode('.jpg', image)
+    # img_str = base64.b64encode(buffer).decode('utf-8')
+    # result['image'] = image
+    # result['flaskImage'] = img_str
+    return result, image
 
 
 if __name__ == '__main__':

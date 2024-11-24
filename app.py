@@ -1,8 +1,14 @@
 import json
+import time
 from flask import Flask, jsonify, request, render_template, send_from_directory
 from flask_cors import CORS
-from HandTracking.handTracking import dictionaryforEverything
+from dictionaryGlobal import dictionaryforEverything
+from HandTracking.handTracking import main
+import threading
 
+thread1 = threading.Thread(target=main, daemon = True)
+thread1.start()
+data_lock = threading.Lock()
 
 app = Flask(__name__, static_folder='build')
 CORS(app)
@@ -15,12 +21,14 @@ def getImage():
 
 @app.route('/getCoords', methods=['GET'])
 def getCoord():
-    print("got Coords")
-    #This contains (x,y) for Hand_position = None if wrong gesture, 
-    # (x,y) for pointer Location = None if wrong gesture, 
-    # float/int for C_distance = None if wrong gesture,
-    # image, used for backend DO NOT USE
-    # flaskImage, Base64 image converted for front-end
+    # with data_lock:
+    try:
+        with open('dictionaryGlobal.json', 'r') as f:
+            dictionaryforEverything = json.load(f)
+    except FileNotFoundError:
+        print("Not Found")
+
+    print("got Coords", dictionaryforEverything)
     return jsonify(dictionaryforEverything), 200
 
 # Serve the React app's index.html
