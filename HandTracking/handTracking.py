@@ -1,5 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+import base64
+from io import BytesIO
 import csv
 import copy
 import argparse
@@ -11,10 +17,13 @@ import cv2 as cv
 import numpy as np
 import mediapipe as mp
 
-from utils import CvFpsCalc
-from model import KeyPointClassifier
-from model import PointHistoryClassifier
+from HandTracking.utils import CvFpsCalc
+from HandTracking.model import KeyPointClassifier
+from HandTracking.model import PointHistoryClassifier
 
+# Global Variable for Flask ###########################
+dictionaryforEverything = {}
+######################################################
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -155,6 +164,7 @@ def main():
                 else:
                     hand_location.append([0, 0])
 
+                C_distance = None
                 if hand_sign_id == 4: #C gesture
                     avg_finger = (
                         np.array(landmark_list[8]) + 
@@ -164,7 +174,7 @@ def main():
                     ) / 4
                     thumb = np.array(landmark_list[4])
                     C_distance = np.linalg.norm(avg_finger - thumb)
-                    cv.putText(debug_image, "C_Distance:" + str(C_distance), (10, 90), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2, cv.LINE_AA)
+                    # cv.putText(debug_image, "C_Distance:" + str(C_distance), (10, 90), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2, cv.LINE_AA)
                 # Grabs distance between C
 
                 # Finger gesture classification
@@ -189,13 +199,16 @@ def main():
                     keypoint_classifier_labels[hand_sign_id],
                     point_history_classifier_labels[most_common_fg_id[0][0]],
                 )
+
+                dictionaryforEverything = returntoFlask(debug_image, hand_location, point_history, C_distance, finger_gesture_id, hand_sign_id)
+                debug_image = dictionaryforEverything.get('image', debug_image)
         else:
             point_history.append([0, 0])
 
-        debug_image = draw_point_history(debug_image, point_history)
-        debug_image = draw_hand_location(debug_image, hand_location)
-        debug_image = draw_info(debug_image, fps, mode, number)
-
+        # debug_image = draw_point_history(debug_image, point_history)
+        # debug_image = draw_hand_location(debug_image, hand_location)
+        # debug_image = draw_info(debug_image, fps, mode, number)
+        # debug_image = returntoFlask(debug_image, hand_location, point_history, C_distance, finger_gesture_id, hand_sign_id)
         # Screen reflection #############################################################
         cv.imshow('Hand Gesture Recognition', debug_image)
 
@@ -580,6 +593,51 @@ def draw_info(image, fps, mode, number):
                        cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1,
                        cv.LINE_AA)
     return image
+
+#packages up necessary values for Flask also displays value right now
+def returntoFlask(image, hand_location, point_history, C_distance, finger_gesture_id, hand_sign_id):
+    result = {}
+    if hand_sign_id == 0 or hand_sign_id == 1:
+        # result['hand_location'] = hand_location
+        for index, point in enumerate(hand_location):
+            if point[0] != 0 and point[1] != 0:
+                cv.circle(image, (point[0], point[1]), 1 + int(index / 2),
+                        (152, 251, 152), 2)
+                cv.rectangle(image, (0, 0), (400, 30), (255, 255, 255), thickness=-1)
+                # cv.putText(image, "Hand Location: " + str(point[0]) + ", " + str(point[1]), (10,30), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv.LINE_AA)
+                result['hand_location'] = (point[0], point[1])
+                cv.putText(image, "Hand Location: " + str(result['hand_location']), (10,30), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv.LINE_AA)
+    else:
+        result['hand_location'] = None
+
+    if hand_sign_id == 2:
+        # result['point_history'] = point_history
+        result['finger_gesture_id'] = finger_gesture_id
+        for index, point in enumerate(point_history):
+            if point[0] != 0 and point[1] != 0:
+                cv.circle(image, (point[0], point[1]), 1 + int(index / 2),
+                        (152, 251, 152), 2)
+                cv.rectangle(image, (0, 0), (400, 30), (255, 255, 255), thickness=-1)
+                # cv.putText(image, "Pointer Location: " + str(point[0]) + ", " + str(point[1]), (10,30), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv.LINE_AA)
+                result['point_history'] = (point[0], point[1])
+                cv.putText(image, "Pointer Location: " + str(result['point_history']), (10,30), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv.LINE_AA)
+    else:
+        result['point_history'] = None
+        result['finger_gesture_id'] = None
+
+    if hand_sign_id == 4:
+        result['C_distance'] = C_distance
+        cv.rectangle(image, (0, 0), (400, 30), (255, 255, 255), thickness=-1)
+        cv.putText(image, "C_Distance:" + str(result['C_distance']), (10, 30), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv.LINE_AA)
+    else:
+        result['C_distance'] = None
+
+    ret, buffer = cv.imencode('.jpg', image)
+    img_str = base64.b64encode(buffer).decode('utf-8')
+    result['image'] = image
+    result['flaskImage'] = img_str
+    return result
+
 
 
 if __name__ == '__main__':
