@@ -22,11 +22,13 @@ def getImage():
 @app.route('/getCoords', methods=['GET'])
 def getCoord():
     # with data_lock:
+    dictionaryforEverything = {}
     try:
         with open('dictionaryGlobal.json', 'r') as f:
             dictionaryforEverything = json.load(f)
     except FileNotFoundError:
-        print("Not Found")
+        print("File 'dictionaryGlobal.json' not found")
+        return jsonify({"error": "File Not Found"}), 404
 
     print("got Coords", dictionaryforEverything)
     return jsonify(dictionaryforEverything), 200

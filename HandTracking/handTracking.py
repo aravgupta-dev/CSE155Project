@@ -212,9 +212,17 @@ def main():
                 newdata, debug_image = returntoFlask(debug_image, hand_location, point_history, C_distance, finger_gesture_id, hand_sign_id)
                 # with data_lock:
                     # dictionaryforEverything.clear()
+                class Encoder(json.JSONEncoder):
+                    def default(self, obj):
+                        if isinstance(obj, np.int64):
+                            return int(obj)
+                        elif isinstance(obj, np.float64):
+                            return float(obj)
+                        return super().default(obj)
+                    
                 dictionaryforEverything.update(newdata)
                 with open('dictionaryGlobal.json', 'w') as f:
-                    json.dump(dictionaryforEverything, f)
+                    json.dump(dictionaryforEverything, f, cls=Encoder)
                     # print("updated Dictionary: ", dictionaryforEverything)
                     # time.sleep(1)
                 # debug_image = dictionaryforEverything.get('image', debug_image)
