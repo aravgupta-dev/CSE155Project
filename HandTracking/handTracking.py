@@ -77,7 +77,7 @@ def main():
     mp_hands = mp.solutions.hands
     hands = mp_hands.Hands(
         static_image_mode=use_static_image_mode,
-        max_num_hands=2,
+        max_num_hands=1,
         min_detection_confidence=min_detection_confidence,
         min_tracking_confidence=min_tracking_confidence,
     )
@@ -658,6 +658,7 @@ def returntoFlask(image, hand_location, point_history, C_distance, finger_gestur
         cv.putText(image, "C_Distance:" + str(result['C_distance']), (10, 30), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv.LINE_AA)
     else:
         result['C_distance'] = None
+    result['hand_sign_id'] = hand_sign_id
 
     # ret, buffer = cv.imencode('.jpg', image)
     # img_str = base64.b64encode(buffer).decode('utf-8')
