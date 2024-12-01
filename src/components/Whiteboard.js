@@ -32,7 +32,7 @@ function Whiteboard({ onTextGenerated }) {
     const fetchCoords = async () => {
       try {
         const response = await axios.get('/getCoords');
-        const { hand_sign_id, hand_location } = response.data;
+        const { hand_sign_id, hand_location, finger_gesture_id, point_history, C_distance } = response.data;
 
         if (hand_location) {
           const [pointerX, pointerY] = hand_location;
@@ -57,6 +57,33 @@ function Whiteboard({ onTextGenerated }) {
             setImagePosition({
               x: normalizedX - imageWidth / 2,
               y: normalizedY - imageHeight / 2,
+            });
+          }
+        }
+
+        if (C_distance && C_position) {
+          const C_dist = C_distance;
+          const [pointerX, pointerY] = C_position;
+
+          // Normalize and clamp coordinates to canvas size
+          const normalizedX = Math.max(0, Math.min(pointerX, 800));
+          const normalizedY = Math.max(0, Math.min(pointerY, 600));
+
+          // Update pointer position
+          setPointerPosition({ x: normalizedX, y: normalizedY });
+
+          // Check if pointer is over the image
+          var isOverImage =
+            normalizedX >= imagePosition.x &&
+            normalizedX <= imagePosition.x + imageWidth &&
+            normalizedY >= imagePosition.y &&
+            normalizedY <= imagePosition.y + imageHeight;
+          setIsPointerOverImage(isOverImage);
+
+          // Update image position only when pointer is over the image and hand_sign_id is 1
+          if (hand_sign_id === 4 && isOverImage) {
+            setImageSize({
+              //Attempting to change size unsure how
             });
           }
         }
