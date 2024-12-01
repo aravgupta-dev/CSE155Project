@@ -210,7 +210,7 @@ def main():
                     point_history_classifier_labels[most_common_fg_id[0][0]],
                 )
 
-                newdata, debug_image = returntoFlask(debug_image, hand_location, point_history, C_distance, finger_gesture_id, hand_sign_id, C_position)
+                newdata, debug_image = returntoFlask(debug_image, hand_location, point_history, C_distance, finger_gesture_id, hand_sign_id)
                 # with data_lock:
                     # dictionaryforEverything.clear()
                 class Encoder(json.JSONEncoder):
@@ -625,9 +625,9 @@ def draw_info_text(image, brect, handedness, hand_sign_text,
 #     return image
 
 #packages up necessary values for Flask also displays value right now
-def returntoFlask(image, hand_location, point_history, C_distance, finger_gesture_id, hand_sign_id, C_position):
+def returntoFlask(image, hand_location, point_history, C_distance, finger_gesture_id, hand_sign_id):
     result = {}
-    if hand_sign_id == 0 or hand_sign_id == 1:
+    if hand_sign_id == 0 or hand_sign_id == 1 or hand_sign_id == 4 or hand_sign_id == 2:
         for index, point in enumerate(hand_location):
             if point[0] != 0 and point[1] != 0:
                 cv.circle(image, (point[0], point[1]), 1 + int(index / 2),
@@ -657,7 +657,7 @@ def returntoFlask(image, hand_location, point_history, C_distance, finger_gestur
         result['C_distance'] = C_distance
         cv.rectangle(image, (0, 0), (400, 30), (255, 255, 255), thickness=-1)
         cv.putText(image, "C_Distance:" + str(result['C_distance']), (10, 30), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv.LINE_AA)
-        result['hand_location'] = C_position
+        #result['hand_location'] = C_position
     else:
         result['C_distance'] = None
     result['hand_sign_id'] = hand_sign_id
