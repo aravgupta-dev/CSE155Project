@@ -183,6 +183,7 @@ def main():
                     ) / 4
                     thumb = np.array(landmark_list[4])
                     C_distance = np.linalg.norm(avg_finger - thumb)
+                    C_position = landmark_list[4]
                     # cv.putText(debug_image, "C_Distance:" + str(C_distance), (10, 90), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2, cv.LINE_AA)
                 # Grabs distance between C
 
@@ -209,7 +210,7 @@ def main():
                     point_history_classifier_labels[most_common_fg_id[0][0]],
                 )
 
-                newdata, debug_image = returntoFlask(debug_image, hand_location, point_history, C_distance, finger_gesture_id, hand_sign_id)
+                newdata, debug_image = returntoFlask(debug_image, hand_location, point_history, C_distance, finger_gesture_id, hand_sign_id, C_position)
                 # with data_lock:
                     # dictionaryforEverything.clear()
                 class Encoder(json.JSONEncoder):
@@ -624,7 +625,7 @@ def draw_info_text(image, brect, handedness, hand_sign_text,
 #     return image
 
 #packages up necessary values for Flask also displays value right now
-def returntoFlask(image, hand_location, point_history, C_distance, finger_gesture_id, hand_sign_id):
+def returntoFlask(image, hand_location, point_history, C_distance, finger_gesture_id, hand_sign_id, C_position):
     result = {}
     if hand_sign_id == 0 or hand_sign_id == 1:
         for index, point in enumerate(hand_location):
@@ -656,6 +657,7 @@ def returntoFlask(image, hand_location, point_history, C_distance, finger_gestur
         result['C_distance'] = C_distance
         cv.rectangle(image, (0, 0), (400, 30), (255, 255, 255), thickness=-1)
         cv.putText(image, "C_Distance:" + str(result['C_distance']), (10, 30), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv.LINE_AA)
+        result['hand_location'] = C_position
     else:
         result['C_distance'] = None
     result['hand_sign_id'] = hand_sign_id
