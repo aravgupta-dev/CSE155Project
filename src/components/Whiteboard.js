@@ -234,7 +234,7 @@ function Whiteboard({ onTextGenerated }) {
     <div className="whiteboard-container">
       <canvas
         ref={canvasRef}
-        style={{ border: '1px solid black' }}
+        style={{ border: '5px solid black' }}
       ></canvas>
       <SpeechToText onTextGenerated={setGeneratedText} />
     </div>
