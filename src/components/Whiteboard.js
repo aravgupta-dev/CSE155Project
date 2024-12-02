@@ -4,161 +4,198 @@ import './Whiteboard.css';
 import axios from 'axios';
 
 function Whiteboard({ onTextGenerated }) {
-  var canvasRef = useRef(null);
-  var [imagePosition, setImagePosition] = useState({ x: 100, y: 100 });
-  var [currentImage, setCurrentImage] = useState('');
-  var [pointerPosition, setPointerPosition] = useState({ x: null, y: null });
-  var [isPointerOverImage, setIsPointerOverImage] = useState(false);
-
-  // Image dimensions (state to allow scaling)
-  var [imageWidth, setImageWidth] = useState(150);
-  var [imageHeight, setImageHeight] = useState(150);
+  const canvasRef = useRef(null);
+  const [images, setImages] = useState([]); // Array of images with their properties
+  const [pointerPosition, setPointerPosition] = useState({ x: null, y: null });
+  const [selectedImageId, setSelectedImageId] = useState(null); // ID of the currently selected image
+  const [isPointerOverImage, setIsPointerOverImage] = useState(false);
 
   // For scaling smoothing
-  var [lastScale, setLastScale] = useState(1); // To store the last known scale for smoothing
-  var [scaleVelocity, setScaleVelocity] = useState(0); // Used to gradually change scale (easing)
+  const [lastScale, setLastScale] = useState(1); // To store the last known scale for smoothing
+  const [scaleVelocity, setScaleVelocity] = useState(0); // Used to gradually change scale (easing)
 
   // For rotation
-  var [rotationAngle, setRotationAngle] = useState(0); // Stores the current rotation angle of the image
-  var [lastPointerPosition, setLastPointerPosition] = useState({ x: null, y: null }); // Stores previous pointer position for rotation
+  const [rotationAngles, setRotationAngles] = useState({}); // Store rotation angles for each image
 
-  // Fetch image on component mount
+  // Text generated from speech
+  const [generatedText, setGeneratedText] = useState('');
+
+  // Trash bin coordinates
+  const trashBin = { x: 650, y: 500, width: 100, height: 100 }; // Define the trash bin area
+
+  // Fetch image on component mount or when generatedText changes
   useEffect(() => {
-    var fetchImage = async () => {
+    const fetchImage = async () => {
       try {
-        var response = await axios.get('/getImage');
-        setCurrentImage(response.data);
+        const response = await axios.get('/getImage', {
+          params: { query: generatedText }, // Pass generatedText as a query param
+        });
+        setImages((prevImages) => [
+          ...prevImages,
+          { 
+            id: Date.now(), 
+            src: response.data, 
+            position: { x: 100, y: 100 }, 
+            width: 150, 
+            height: 150, 
+            rotation: 0, 
+            imageElement: null // Placeholder for cached image element
+          },
+        ]);
       } catch (error) {
         console.error('Error fetching the image:', error);
       }
     };
-    fetchImage();
-  }, []);
+
+    if (generatedText) {
+      fetchImage(); // Fetch image when generatedText is available
+    }
+  }, [generatedText]);
 
   // Fetch coordinates and update image position and scaling
   useEffect(() => {
-    var fetchCoords = async () => {
+    const fetchCoords = async () => {
       try {
-        var response = await axios.get('/getCoords');
-        var { hand_sign_id, hand_location, C_distance, point_history } = response.data;
+        const response = await axios.get('/getCoords');
+        const { hand_sign_id, hand_location, C_distance, point_history } = response.data;
 
         if (hand_location) {
-          var [pointerX, pointerY] = hand_location;
+          const [pointerX, pointerY] = hand_location;
 
           // Normalize and clamp coordinates to canvas size
-          var normalizedX = Math.max(0, Math.min(pointerX, 800));
-          var normalizedY = Math.max(0, Math.min(pointerY, 600));
+          const normalizedX = Math.max(0, Math.min(pointerX, 800));
+          const normalizedY = Math.max(0, Math.min(pointerY, 600));
 
           // Update pointer position
           setPointerPosition({ x: normalizedX, y: normalizedY });
 
-          // Check if pointer is over the image
-          var isOverImage =
-            normalizedX >= imagePosition.x &&
-            normalizedX <= imagePosition.x + imageWidth &&
-            normalizedY >= imagePosition.y &&
-            normalizedY <= imagePosition.y + imageHeight;
-          setIsPointerOverImage(isOverImage);
+          // Check if pointer is over any image
+          let newSelectedImageId = null;
+          setIsPointerOverImage(false);
+          let newCursorStyle = 'default'; // Default cursor
 
-          // Update image position when pointer is over the image and hand_sign_id is 1
-          if (hand_sign_id === 1 && isOverImage) {
-            setImagePosition({
-              x: normalizedX - imageWidth / 2,
-              y: normalizedY - imageHeight / 2,
-            });
-          }
+          setImages((prevImages) =>
+            prevImages.map((image) => {
+              const isOverImage =
+                normalizedX >= image.position.x &&
+                normalizedX <= image.position.x + image.width &&
+                normalizedY >= image.position.y &&
+                normalizedY <= image.position.y + image.height;
 
-          // Scale the image when pointer is over the image and hand_sign_id is 4
-          if (hand_sign_id === 4 && isOverImage && C_distance != null) {
-            // Normalize C_distance (scaling factor between 0.5 and 2)
-            var normalizedScale = Math.max(0.5, Math.min(C_distance / 100, 2));
+              if (isOverImage) {
+                setIsPointerOverImage(true);
+                newSelectedImageId = image.id; // Set the ID of the image the pointer is over
 
-            // Introduce smoothing/easing for scale (lerping the scale value)
-            var scaleDifference = normalizedScale - lastScale;
-
-            // Apply a small factor to gradually change scale (this is the smoothing)
-            setScaleVelocity(scaleDifference * 0.1); // The smaller the value, the smoother the transition
-
-            // Update the lastScale value after applying the smoothing
-            setLastScale(lastScale + scaleVelocity);
-
-            // Apply the new smooth scale to image dimensions
-            setImageWidth(150 * lastScale);
-            setImageHeight(150 * lastScale);
-          }
-
-          // Rotate the image when pointer is over the image and hand_sign_id is 2
-          if (hand_sign_id === 2 && isOverImage && point_history) {
-            var [x, y] = point_history; // Get the last two points
-            if (x && y) {
-              // Calculate horizontal movement for rotation
-              var deltaX = x - y; // Get the relative X position difference
-
-              // Only rotate when there's a significant X movement
-              if (Math.abs(deltaX) > 5) {
-                // Smooth the rotation by multiplying by 0.1
-                setRotationAngle(prevAngle => {
-                  // Normalize rotation angle between 0 and 360
-                  var newAngle = prevAngle + deltaX * 0.1;
-                  return (newAngle + 360) % 360; // Ensure rotation stays within 0-360 degrees
-                });
+                // Change cursor based on hand_sign_id
+                if (hand_sign_id === 1) {
+                  newCursorStyle = 'move'; // Move cursor for dragging
+                } else if (hand_sign_id === 4 && C_distance != null) {
+                  newCursorStyle = C_distance > 100 ? 'zoom-out' : 'zoom-in'; // Zoom cursor for scaling
+                } else if (hand_sign_id === 2 && point_history) {
+                  newCursorStyle = 'grabbing'; // Grabbing cursor for rotating
+                }
               }
-            }
-            setLastPointerPosition({ x: pointerX, y: pointerY }); // Update the last pointer position
+
+              // Update image position when pointer is over it and hand_sign_id is 1
+              if (hand_sign_id === 1 && isOverImage) {
+                return {
+                  ...image,
+                  position: {
+                    x: normalizedX - image.width / 2,
+                    y: normalizedY - image.height / 2,
+                  },
+                };
+              }
+
+              // Scale the image when pointer is over the image and hand_sign_id is 4
+              if (hand_sign_id === 4 && isOverImage && C_distance != null) {
+                const normalizedScale = Math.max(0.5, Math.min(C_distance / 100, 2));
+
+                const scaleDifference = normalizedScale - lastScale;
+                setScaleVelocity(scaleDifference * 0.1); // The smaller the value, the smoother the transition
+                setLastScale(lastScale + scaleVelocity);
+
+                return {
+                  ...image,
+                  width: 150 * lastScale,
+                  height: 150 * lastScale,
+                };
+              }
+
+              // Rotate the image when pointer is over the image and hand_sign_id is 2
+              if (hand_sign_id === 2 && isOverImage && point_history) {
+                const [x, y] = point_history;
+                if (x && y) {
+                  const deltaX = x - y;
+                  if (Math.abs(deltaX) > 5) {
+                    setRotationAngles((prevAngles) => {
+                      const newAngle = (prevAngles[image.id] || 0) + deltaX * 0.05;
+                      return { ...prevAngles, [image.id]: (newAngle + 360) % 360 };
+                    });
+                  }
+                }
+              }
+
+              return image;
+            })
+          );
+
+          // Update the selected image ID
+          if (newSelectedImageId !== selectedImageId) {
+            setSelectedImageId(newSelectedImageId);
           }
+
+          // Check if any image is in the trash bin's area and delete it
+          setImages((prevImages) => prevImages.filter((image) => {
+            const isInTrashBin =
+              image.position.x + image.width > trashBin.x &&
+              image.position.x < trashBin.x + trashBin.width &&
+              image.position.y + image.height > trashBin.y &&
+              image.position.y < trashBin.y + trashBin.height;
+
+            return !isInTrashBin; // Keep the image if it's not in the trash bin
+          }));
+
+          // Update cursor style
+          document.body.style.cursor = newCursorStyle;
+
         }
       } catch (error) {
         console.error('Error fetching coordinates:', error);
       }
     };
 
-    var interval = setInterval(fetchCoords, 20); // Fetch data every 20ms
+    const interval = setInterval(fetchCoords, 20); // Fetch data every 20ms
     return () => clearInterval(interval); // Cleanup on unmount
-  }, [imagePosition, lastScale, scaleVelocity, rotationAngle, lastPointerPosition]); // Dependencies
+  }, [lastScale, scaleVelocity, selectedImageId]);
 
-  // Draw image and pointer
+  // Draw images and pointer
   useEffect(() => {
-    var canvas = canvasRef.current;
-    var ctx = canvas.getContext('2d');
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
 
     canvas.width = 800;
     canvas.height = 600;
 
-    if (!currentImage) return;
-
-    var img = new Image();
-    img.src = currentImage;
-
-    img.onload = () => {
-      // Clear canvas
+    if (images.length > 0) {
+      // Only clear canvas when necessary
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = 'white';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Set the transformation for rotation
-      ctx.save();
-
-      // Translate to the center of the image
-      ctx.translate(imagePosition.x + imageWidth / 2, imagePosition.y + imageHeight / 2);
-
-      // Apply rotation in radians
-      ctx.rotate(rotationAngle * Math.PI / 180);
-
-      // Translate back to the top-left corner
-      ctx.translate(-imageWidth / 2, -imageHeight / 2);
-
-      // Draw image with border if pointer is over it
-      if (isPointerOverImage) {
-        ctx.strokeStyle = 'blue';
-        ctx.lineWidth = 4;
-        ctx.strokeRect(0, 0, imageWidth, imageHeight);
-      }
-
-      // Draw image with updated width, height, and rotation
-      ctx.drawImage(img, 0, 0, imageWidth, imageHeight);
-
-      // Restore the context to its original state (to prevent affecting other drawings)
-      ctx.restore();
+      images.forEach((image) => {
+        if (!image.imageElement) {
+          // Create an image element only once
+          const img = new Image();
+          img.src = image.src;
+          img.onload = () => {
+            image.imageElement = img;
+            drawImage(image);
+          };
+        } else {
+          drawImage(image);
+        }
+      });
 
       // Draw pointer
       if (pointerPosition.x !== null && pointerPosition.y !== null) {
@@ -168,20 +205,38 @@ function Whiteboard({ onTextGenerated }) {
         ctx.fill();
         ctx.closePath();
       }
-    };
-  }, [currentImage, imagePosition, pointerPosition, isPointerOverImage, imageWidth, imageHeight, rotationAngle]);  // Dependencies to trigger update
+
+    }
+  }, [images, pointerPosition, isPointerOverImage, selectedImageId, rotationAngles]);
+
+  const drawImage = (image) => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+
+    ctx.save();
+    ctx.translate(image.position.x + image.width / 2, image.position.y + image.height / 2);
+    const rotation = rotationAngles[image.id] || image.rotation;
+    ctx.rotate((rotation * Math.PI) / 180);
+    ctx.translate(-image.width / 2, -image.height / 2);
+
+    // Highlight only the selected image
+    if (image.id === selectedImageId) {
+      ctx.strokeStyle = 'blue';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(0, 0, image.width, image.height);
+    }
+
+    ctx.drawImage(image.imageElement, 0, 0, image.width, image.height);
+    ctx.restore();
+  };
 
   return (
     <div className="whiteboard-container">
-      <canvas ref={canvasRef} style={{ border: '1px solid black' }}></canvas>
-      <div className="coords-display">
-        <p>Pointer Coordinates: X = {pointerPosition.x ?? 'N/A'}, Y = {pointerPosition.y ?? 'N/A'}</p>
-        <p>Image Position: X = {imagePosition.x}, Y = {imagePosition.y}</p>
-        <p>Image Dimensions: Width = {imageWidth}, Height = {imageHeight}</p>
-        <p>Rotation Angle: {rotationAngle.toFixed(2)}°</p>
-        <p>{isPointerOverImage ? 'Pointer is over the image' : 'Pointer is not over the image'}</p>
-      </div>
-      <SpeechToText onTextGenerated={onTextGenerated} />
+      <canvas
+        ref={canvasRef}
+        style={{ border: '1px solid black' }}
+      ></canvas>
+      <SpeechToText onTextGenerated={setGeneratedText} />
     </div>
   );
 }
