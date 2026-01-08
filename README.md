@@ -1,70 +1,36 @@
-# Getting Started with Create React App
+# P!icture Th!s
+P!icture Th!s is an interactive, browser-based whiteboard application that combines speech recognition, computer vision, and gesture-based interaction to create a hands-free, intuitive creative experience. Users can speak ideas into the system, see those ideas visualized as images on a shared whiteboard, and manipulate them in real time using hand gestures captured through a webcam.
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+## Overview
+The application enables users to:
+* Speak aloud to generate visual representations of their ideas
+* Automatically add generated images to a digital whiteboard
+* Use hand gestures to move, rotate, and resize images
+* Interact naturally without physical input devices such as a mouse or keyboard
+The core innovation of the project lies in its real-time hand tracking and gesture recognition pipeline, which translates physical hand movements into precise transformations applied to on-screen elements.
 
-## Available Scripts
+## Key Features
+* **Voice-to-Image Pipeline**
+  - Spoken input is processed and converted into visual elements that are added to the whiteboard.
 
-In the project directory, you can run:
+* **Gesture-Based Interaction**
+  - Hand gestures detected through a webcam allow users to:
+    + Translate (move) images
+    + Rotate images
+    + Resize images
+* **Real-Time Computer Vision**
+  - Low-latency hand tracking enables smooth and responsive interaction.
+ 
+## Technical Details
+### Model Training
+* Training and experimentation were performed in Jupyter Notebook
+* Gesture datasets were stored and processed from CSV files
+* Model outputs included hand landmarks and gesture states used for downstream logic
+### Gesture Mapping Logic
+Detected gestures were translated into geometric transformations:
 
-### `npm start`
+* Translation → Position updates (x, y)
+* Rotation → Angle calculations based on index finger relative position
+* Scaling → Distance-based resizing using landmark separation
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
-
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
-
-### `npm test`
-
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
-
-### `npm run build`
-
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
-
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
-
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
-
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+These transformations were applied continuously to ensure smooth, real-time manipulation of whiteboard elements.
